@@ -1,0 +1,15 @@
+{
+
+  "json.schemas": [
+
+    {
+
+      "fileMatch": ["package.json"],
+
+      "url": "ignore"
+
+    }
+
+  ]
+
+}
