@@ -75,28 +75,38 @@ export default function DashboardPage() {
   );
 }
 
-// app/ritual/[id]/page.js - Dynamic Ritual Player Page
+// app/rituals/page.js - Rituals Page
 'use client';
 
 import { Suspense } from 'react';
-import RitualPlayer from '@/components/RitualPlayer';
+import RitualsPage from '@/components/RitualsPage';
 
-// Loading component for ritual player
-function RitualPlayerLoading() {
+function RitualsLoading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 text-center">
-        <div className="animate-spin w-12 h-12 border-4 border-white/20 border-t-white rounded-full mx-auto mb-4"></div>
-        <p className="text-white/80">Loading your ritual...</p>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="animate-pulse">
+          <div className="h-8 bg-slate-200 rounded w-1/3 mb-8"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="bg-white rounded-2xl p-6 shadow-sm">
+                <div className="h-4 bg-slate-200 rounded w-1/2 mb-4"></div>
+                <div className="h-6 bg-slate-200 rounded w-3/4 mb-2"></div>
+                <div className="h-4 bg-slate-200 rounded w-full mb-4"></div>
+                <div className="h-10 bg-slate-200 rounded w-full"></div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-export default function RitualPage() {
+export default function RitualsPageWrapper() {
   return (
-    <Suspense fallback={<RitualPlayerLoading />}>
-      <RitualPlayer />
+    <Suspense fallback={<RitualsLoading />}>
+      <RitualsPage />
     </Suspense>
   );
 }
@@ -107,7 +117,6 @@ export default function RitualPage() {
 import { Suspense } from 'react';
 import ProgressPage from '@/components/ProgressPage';
 
-// Loading component for progress page
 function ProgressLoading() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50 p-4 sm:p-6 lg:p-8">
@@ -146,7 +155,6 @@ export default function ProgressPageWrapper() {
 import { Suspense } from 'react';
 import OnboardingFlow from '@/components/OnboardingFlow';
 
-// Loading component for onboarding
 function OnboardingLoading() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50 flex items-center justify-center p-4">
@@ -168,83 +176,27 @@ export default function OnboardingPage() {
   );
 }
 
-// app/globals.css - Global Styles
-/* 
-@tailwind base;
-@tailwind components;  
-@tailwind utilities;
+// app/ritual/[id]/page.js - Dynamic Ritual Player Page
+'use client';
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+import { Suspense } from 'react';
+import RitualPlayer from '@/components/RitualPlayer';
+
+function RitualPlayerLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 text-center">
+        <div className="animate-spin w-12 h-12 border-4 border-white/20 border-t-white rounded-full mx-auto mb-4"></div>
+        <p className="text-white/80">Loading your ritual...</p>
+      </div>
+    </div>
+  );
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
+export default function RitualPage() {
+  return (
+    <Suspense fallback={<RitualPlayerLoading />}>
+      <RitualPlayer />
+    </Suspense>
+  );
 }
-
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-}
-
-// Custom scrollbar styles
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-// Animation keyframes
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-in {
-  animation: fadeIn 0.5s ease-out;
-}
-
-// Focus visible styles for accessibility
-.focus-visible:focus {
-  outline: 2px solid #10B981;
-  outline-offset: 2px;
-}
-*/

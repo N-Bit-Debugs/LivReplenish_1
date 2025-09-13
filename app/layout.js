@@ -1,42 +1,17 @@
+// app/layout.js
 import Navigation from '@/app/Navigation';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
-// Create a client instance outside of the component to prevent re-creation on every render
-let queryClient;
-
-function getQueryClient() {
-  if (!queryClient) {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          // With SSR, we usually want to set some default staleTime
-          // above 0 to avoid refetching immediately on the client
-          staleTime: 60 * 1000, // 1 minute
-          retry: 2,
-          refetchOnWindowFocus: false,
-        },
-        mutations: {
-          retry: 1,
-        },
-      },
-    });
-  }
-  return queryClient;
-}
-
 export const metadata = {
   title: 'LivReplenish - Your Vitality Journey',
   description: 'Personalized rituals and insights to enhance your mental vitality and well-being',
   keywords: 'vitality, wellness, meditation, focus, habits, neuroplasticity',
   authors: [{ name: 'LivReplenish Team' }],
-  viewport: 'width=device-width, initial-scale=1',
-  themeColor: '#10B981',
+  metadataBase: new URL('http://localhost:3000'),
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',
@@ -64,17 +39,14 @@ export const metadata = {
   },
 };
 
-// Client-side Providers wrapper
-function Provideres({ children }) {
-  const client = getQueryClient();
-
-  return (
-    <QueryClientProvider client={client}>
-      {children}
-      <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
-  );
-}
+// Move viewport and themeColor to separate export as required by Next.js 15
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#10B981',
+};
 
 export default function RootLayout({ children }) {
   return (
@@ -89,9 +61,6 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="LivReplenish" />
-        
-        {/* Prevent zoom on iOS */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
       </head>
       
       <body className={`${inter.className} antialiased min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50`}>
