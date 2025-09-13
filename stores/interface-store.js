@@ -1,146 +1,229 @@
 // stores/interface-store.js
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 
-const useInterfaceStore = create()(
-  devtools(
+const useInterfaceStore = create(
+  subscribeWithSelector(
     persist(
       (set, get) => ({
-        // Navigation state
-        isMenuOpen: false,
-        currentPage: 'dashboard',
+        // Notification system
+        notifications: [],
         
         // Loading states
-        isLoading: false,
-        loadingMessage: '',
+        globalLoading: false,
+        formSubmitting: false,
         
-        // Notifications
-        notifications: [],
-        notificationCounter: 0,
+        // Progress tracking
+        progressTimeRange: '30d',
+        progressChartType: 'area',
         
-        // Modal states
-        isModalOpen: false,
-        modalContent: null,
-        modalType: 'default',
-        
-        // Theme and preferences
+        // User preferences
         theme: 'light',
-        reducedMotion: false,
-        soundEnabled: true,
+        sidebarCollapsed: false,
         
-        // Navigation actions
-        setIsMenuOpen: (isOpen) => set({ isMenuOpen: isOpen }),
-        setCurrentPage: (page) => set({ currentPage: page }),
+        // Dashboard state
+        dashboardData: null,
+        lastUpdated: null,
         
-        // Loading actions
-        setIsLoading: (loading, message = '') => set({ 
-          isLoading: loading, 
-          loadingMessage: message 
-        }),
-        
-        // Notification actions
-        addNotification: (notification) => {
-          const { notifications, notificationCounter } = get();
-          const newNotification = {
-            id: notificationCounter + 1,
-            timestamp: new Date().toISOString(),
-            type: 'info',
-            autoClose: true,
-            duration: 5000,
-            ...notification,
+        // Actions
+        showNotification: (message, type = 'info', duration = 5000) => {
+          const id = `notification-${Date.now()}-${Math.random()}`;
+          const notification = {
+            id,
+            message,
+            type,
+            duration,
+            timestamp: Date.now()
           };
           
-          set({
-            notifications: [...notifications, newNotification],
-            notificationCounter: notificationCounter + 1,
-          });
+          set((state) => ({
+            notifications: [...state.notifications, notification]
+          }));
           
-          // Auto remove notification after duration
-          if (newNotification.autoClose) {
+          // Auto-remove notification after duration
+          if (duration > 0) {
             setTimeout(() => {
-              get().removeNotification(newNotification.id);
-            }, newNotification.duration);
+              get().removeNotification(id);
+            }, duration);
           }
+          
+          return id;
         },
         
         removeNotification: (id) => {
-          const { notifications } = get();
-          set({
-            notifications: notifications.filter(n => n.id !== id),
+          set((state) => ({
+            notifications: state.notifications.filter(n => n.id !== id)
+          }));
+        },
+        
+        clearAllNotifications: () => {
+          set({ notifications: [] });
+        },
+        
+        // Success notification helper
+        showSuccessNotification: (message) => {
+          return get().showNotification(message, 'success', 5000);
+        },
+        
+        // Error notification helper
+        showErrorNotification: (message) => {
+          return get().showNotification(message, 'error', 7000);
+        },
+        
+        // Warning notification helper
+        showWarningNotification: (message) => {
+          return get().showNotification(message, 'warning', 6000);
+        },
+        
+        // Loading states
+        setGlobalLoading: (loading) => {
+          set({ globalLoading: loading });
+        },
+        
+        setFormSubmitting: (submitting) => {
+          set({ formSubmitting: submitting });
+        },
+        
+        // Progress settings
+        setProgressTimeRange: (range) => {
+          set({ progressTimeRange: range });
+        },
+        
+        setProgressChartType: (type) => {
+          set({ progressChartType: type });
+        },
+        
+        // Theme management
+        setTheme: (theme) => {
+          set({ theme });
+          // Apply theme to document
+          if (typeof document !== 'undefined') {
+            document.documentElement.setAttribute('data-theme', theme);
+          }
+        },
+        
+        toggleTheme: () => {
+          const currentTheme = get().theme;
+          const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+          get().setTheme(newTheme);
+        },
+        
+        // Sidebar management
+        setSidebarCollapsed: (collapsed) => {
+          set({ sidebarCollapsed: collapsed });
+        },
+        
+        toggleSidebar: () => {
+          set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }));
+        },
+        
+        // Dashboard data management
+        setDashboardData: (data) => {
+          set({ 
+            dashboardData: data, 
+            lastUpdated: Date.now() 
           });
         },
         
-        clearAllNotifications: () => set({ notifications: [] }),
-        
-        // Modal actions
-        openModal: (content, type = 'default') => set({
-          isModalOpen: true,
-          modalContent: content,
-          modalType: type,
-        }),
-        
-        closeModal: () => set({
-          isModalOpen: false,
-          modalContent: null,
-          modalType: 'default',
-        }),
-        
-        // Theme and preference actions
-        setTheme: (theme) => set({ theme }),
-        toggleTheme: () => {
-          const { theme } = get();
-          set({ theme: theme === 'light' ? 'dark' : 'light' });
+        updateRitualStatus: (ritualId, completed) => {
+          set((state) => {
+            if (!state.dashboardData?.rituals) return state;
+            
+            const updatedRituals = state.dashboardData.rituals.map(ritual =>
+              ritual.id === ritualId ? { ...ritual, completed } : ritual
+            );
+            
+            return {
+              dashboardData: {
+                ...state.dashboardData,
+                rituals: updatedRituals
+              },
+              lastUpdated: Date.now()
+            };
+          });
         },
-        
-        setReducedMotion: (reduced) => set({ reducedMotion: reduced }),
-        setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
         
         // Utility actions
-        showSuccessNotification: (message) => {
-          get().addNotification({
-            message,
-            type: 'success',
-            duration: 4000,
+        reset: () => {
+          set({
+            notifications: [],
+            globalLoading: false,
+            formSubmitting: false,
+            progressTimeRange: '30d',
+            progressChartType: 'area',
+            theme: 'light',
+            sidebarCollapsed: false,
+            dashboardData: null,
+            lastUpdated: null
           });
         },
         
-        showErrorNotification: (message) => {
-          get().addNotification({
-            message,
-            type: 'error',
-            duration: 6000,
-          });
-        },
-        
-        showWarningNotification: (message) => {
-          get().addNotification({
-            message,
-            type: 'warning',
-            duration: 5000,
-          });
-        },
-        
-        showInfoNotification: (message) => {
-          get().addNotification({
-            message,
-            type: 'info',
-            duration: 4000,
-          });
-        },
+        // Batch operations
+        batchUpdate: (updates) => {
+          set((state) => ({ ...state, ...updates }));
+        }
       }),
       {
-        name: 'interface-store',
+        name: 'livreplenish-interface-store',
         partialize: (state) => ({
+          // Only persist these values
+          progressTimeRange: state.progressTimeRange,
+          progressChartType: state.progressChartType,
           theme: state.theme,
-          reducedMotion: state.reducedMotion,
-          soundEnabled: state.soundEnabled,
+          sidebarCollapsed: state.sidebarCollapsed
         }),
+        version: 1,
+        migrate: (persistedState, version) => {
+          // Handle store migrations if needed
+          if (version === 0) {
+            // Migration from version 0 to 1
+            return {
+              ...persistedState,
+              progressChartType: 'area' // Set default for new field
+            };
+          }
+          return persistedState;
+        }
       }
-    ),
-    {
-      name: 'interface-store',
-    }
+    )
   )
 );
+
+// Selector hooks for better performance
+export const useNotifications = () => useInterfaceStore((state) => state.notifications);
+export const useGlobalLoading = () => useInterfaceStore((state) => state.globalLoading);
+export const useFormSubmitting = () => useInterfaceStore((state) => state.formSubmitting);
+export const useTheme = () => useInterfaceStore((state) => state.theme);
+export const useDashboardData = () => useInterfaceStore((state) => state.dashboardData);
+
+// Action-only hooks for components that only need actions
+export const useNotificationActions = () => useInterfaceStore((state) => ({
+  showNotification: state.showNotification,
+  removeNotification: state.removeNotification,
+  clearAllNotifications: state.clearAllNotifications,
+  showSuccessNotification: state.showSuccessNotification,
+  showErrorNotification: state.showErrorNotification,
+  showWarningNotification: state.showWarningNotification
+}));
+
+export const useLoadingActions = () => useInterfaceStore((state) => ({
+  setGlobalLoading: state.setGlobalLoading,
+  setFormSubmitting: state.setFormSubmitting
+}));
+
+export const useProgressActions = () => useInterfaceStore((state) => ({
+  setProgressTimeRange: state.setProgressTimeRange,
+  setProgressChartType: state.setProgressChartType
+}));
+
+export const useThemeActions = () => useInterfaceStore((state) => ({
+  setTheme: state.setTheme,
+  toggleTheme: state.toggleTheme
+}));
+
+export const useDashboardActions = () => useInterfaceStore((state) => ({
+  setDashboardData: state.setDashboardData,
+  updateRitualStatus: state.updateRitualStatus
+}));
 
 export default useInterfaceStore;

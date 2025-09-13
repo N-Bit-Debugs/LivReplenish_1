@@ -1,276 +1,281 @@
-// components/RitualCard.jsx - Enhanced with better UI and animations
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-import useInterfaceStore from '@/stores/interface-store';
+import React, { useState, useCallback } from 'react';
+import { Play, CheckCircle2, Clock, Target, Zap, Award } from 'lucide-react';
 
-const RitualCard = ({ ritual }) => {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const { showNotification } = useInterfaceStore();
+const RitualCard = ({ 
+  ritual, 
+  onStart, 
+  onComplete, 
+  loading = false,
+  className = "" 
+}) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
 
-  // Enhanced completion mutation with optimistic updates
-  const completeRitualMutation = useMutation({
-    mutationFn: (ritualId) => apiClient.post(`/api/rituals/${ritualId}/complete`),
-    onMutate: async (ritualId) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['plan', 'today'] });
-      
-      // Snapshot previous value
-      const previousData = queryClient.getQueryData(['plan', 'today']);
-      
-      // Optimistically update
-      queryClient.setQueryData(['plan', 'today'], (oldData) => {
-        if (!oldData) return oldData;
-        
-        return {
-          ...oldData,
-          rituals: oldData.rituals.map(r => 
-            r.id === ritualId ? { ...r, completed: true } : r
-          )
-        };
-      });
-      
-      return { previousData };
-    },
-    onSuccess: (data, ritualId) => {
-      showNotification('Ritual completed! Great work! 🎉', 'success');
-      
-      // Invalidate related queries
-      queryClient.invalidateQueries({ queryKey: ['plan', 'today'] });
-      queryClient.invalidateQueries({ queryKey: ['progress'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-    },
-    onError: (error, ritualId, context) => {
-      // Rollback optimistic update
-      queryClient.setQueryData(['plan', 'today'], context?.previousData);
-      showNotification('Failed to complete ritual. Please try again.', 'error');
-      console.error('Failed to complete ritual:', error);
+  // Handle start ritual with loading state
+  const handleStart = useCallback(async () => {
+    if (loading || ritual.completed) return;
+    
+    try {
+      await onStart?.(ritual.id);
+    } catch (error) {
+      console.error('Failed to start ritual:', error);
     }
-  });
+  }, [onStart, ritual.id, ritual.completed, loading]);
 
-  const handleStartRitual = () => {
-    // Add loading state and smooth transition
-    router.push(`/ritual/${ritual.id}`);
-  };
-
-  const handleCompleteRitual = (e) => {
+  // Handle complete ritual with loading state  
+  const handleComplete = useCallback(async (e) => {
     e.stopPropagation();
-    completeRitualMutation.mutate(ritual.id);
-  };
-
-  const formatDuration = (minutes) => {
-    if (minutes < 60) {
-      return `${minutes}min`;
+    if (isCompleting || ritual.completed) return;
+    
+    setIsCompleting(true);
+    try {
+      await onComplete?.(ritual.id);
+    } catch (error) {
+      console.error('Failed to complete ritual:', error);
+    } finally {
+      setIsCompleting(false);
     }
+  }, [onComplete, ritual.id, ritual.completed, isCompleting]);
+
+  // Format duration helper
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0min';
+    
+    if (seconds < 60) return `${seconds}s`;
+    
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}min`;
+    
     const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}min` : `${hours}h`;
   };
 
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty?.toLowerCase()) {
-      case 'beginner': return 'bg-green-100 text-green-700 border-green-200';
-      case 'intermediate': return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'advanced': return 'bg-red-100 text-red-700 border-red-200';
-      default: return 'bg-blue-100 text-blue-700 border-blue-200';
-    }
+  // Get ritual type icon
+  const getRitualIcon = (type) => {
+    const iconMap = {
+      meditation: '🧘‍♀️',
+      breathing: '💨', 
+      focus: '🎯',
+      movement: '🤸‍♀️',
+      mindfulness: '🌸',
+      energy: '⚡',
+      relaxation: '😌',
+      gratitude: '🙏',
+      visualization: '💭',
+      default: '✨'
+    };
+    return iconMap[type?.toLowerCase()] || iconMap.default;
   };
 
-  const getRitualTypeIcon = (type) => {
-    switch (type?.toLowerCase()) {
-      case 'meditation':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-        );
-      case 'breathing':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        );
-      case 'focus':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        );
-    }
+  // Get difficulty styling
+  const getDifficultyStyles = (difficulty) => {
+    const styles = {
+      beginner: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      intermediate: 'bg-amber-100 text-amber-700 border-amber-200', 
+      advanced: 'bg-red-100 text-red-700 border-red-200'
+    };
+    return styles[difficulty?.toLowerCase()] || 'bg-slate-100 text-slate-700 border-slate-200';
+  };
+
+  // Calculate estimated points
+  const getEstimatedPoints = () => {
+    if (ritual.estimatedImpact) return ritual.estimatedImpact;
+    
+    // Fallback calculation based on duration and difficulty
+    const basePoints = Math.floor((ritual.duration || 300) / 60); // 1 point per minute
+    const difficultyMultiplier = {
+      beginner: 1,
+      intermediate: 1.2,
+      advanced: 1.5
+    };
+    
+    const multiplier = difficultyMultiplier[ritual.difficulty?.toLowerCase()] || 1;
+    return Math.max(5, Math.round(basePoints * multiplier));
   };
 
   return (
     <div 
       className={`
-        relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/50 
+        relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border 
         transition-all duration-300 cursor-pointer group overflow-hidden
         ${ritual.completed 
-          ? 'border-emerald-200/50 bg-emerald-50/30' 
-          : 'hover:shadow-xl hover:scale-[1.02] hover:border-emerald-300/50 active:scale-[0.98]'
+          ? 'border-emerald-200 bg-emerald-50/30' 
+          : 'border-white/50 hover:shadow-xl hover:scale-[1.02] hover:border-emerald-300/50 active:scale-[0.98]'
         }
-        ${isHovered && !ritual.completed ? 'shadow-lg' : ''}
+        ${loading ? 'pointer-events-none opacity-60' : ''}
+        ${className}
       `}
-      onClick={ritual.completed ? undefined : handleStartRitual}
+      onClick={ritual.completed ? undefined : handleStart}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      role="button"
+      tabIndex={ritual.completed ? -1 : 0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleStart();
+        }
+      }}
+      aria-label={`${ritual.name} ritual - ${ritual.completed ? 'completed' : 'start ritual'}`}
     >
       {/* Animated background gradient */}
       <div className={`
-        absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-blue-500/5 opacity-0 
+        absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-blue-500/5 
         transition-opacity duration-300
-        ${isHovered && !ritual.completed ? 'opacity-100' : ''}
+        ${isHovered && !ritual.completed ? 'opacity-100' : 'opacity-0'}
       `} />
 
-      {/* Completion Badge with animation */}
+      {/* Completion badge */}
       {ritual.completed && (
         <div className="absolute -top-2 -right-2 z-10 animate-in zoom-in-75 duration-500">
           <div className="bg-emerald-500 text-white rounded-full p-2.5 shadow-lg ring-4 ring-white">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
+            <CheckCircle2 className="w-4 h-4" />
           </div>
         </div>
       )}
 
+      {/* Loading overlay */}
+      {loading && (
+        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm rounded-2xl z-20 flex items-center justify-center">
+          <div className="animate-spin w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+        </div>
+      )}
+
       <div className="relative p-6">
-        {/* Header with enhanced visual hierarchy */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1 pr-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`
-                w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300
-                ${ritual.completed 
-                  ? 'bg-emerald-100 text-emerald-600' 
-                  : 'bg-gradient-to-br from-emerald-500 to-blue-600 text-white group-hover:scale-110'
-                }
-              `}>
-                {getRitualTypeIcon(ritual.type)}
-              </div>
-              <div className="flex-1">
-                <h3 className={`text-lg font-semibold mb-1 ${
-                  ritual.completed ? 'text-emerald-800' : 'text-slate-800'
-                }`}>
-                  {ritual.name}
-                </h3>
-                {ritual.difficulty && (
-                  <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${getDifficultyColor(ritual.difficulty)}`}>
-                    {ritual.difficulty}
-                  </span>
-                )}
-              </div>
-            </div>
-            <p className={`text-sm leading-relaxed ${
-              ritual.completed ? 'text-emerald-600' : 'text-slate-600'
-            }`}>
-              {ritual.description}
-            </p>
+        {/* Header section */}
+        <div className="flex items-start gap-4 mb-4">
+          <div className={`
+            text-3xl transition-transform duration-300
+            ${!ritual.completed && isHovered ? 'scale-110' : ''}
+          `}>
+            {getRitualIcon(ritual.type)}
           </div>
-        </div>
-
-        {/* Enhanced badges section */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            {/* Duration Badge */}
-            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-              ritual.completed 
-                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                : 'bg-blue-100 text-blue-700 border border-blue-200'
-            }`}>
-              <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-              </svg>
-              {formatDuration(ritual.duration)}
-            </span>
-
-            {/* Audio Indicator */}
-            {ritual.audioSrc && (
-              <span className={`inline-flex items-center text-xs px-2 py-1 rounded-md ${
-                ritual.completed ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500 bg-slate-100'
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <h3 className={`font-semibold text-lg truncate ${
+                ritual.completed ? 'text-emerald-800' : 'text-slate-800'
               }`}>
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.785l-4.906-3.64H2a1 1 0 01-1-1V8a1 1 0 011-1h1.477l4.906-3.64a1 1 0 011-.284z" clipRule="evenodd" />
-                  <path d="M11.525 6.098a1 1 0 011.37.527 2.5 2.5 0 010 2.75 1 1 0 11-1.898-.776 1.5 1.5 0 000-1.198 1 1 0 01.528-1.303z" />
-                </svg>
-                Guided
+                {ritual.name}
+              </h3>
+              
+              {ritual.difficulty && (
+                <span className={`
+                  px-2 py-1 text-xs font-medium rounded-md border shrink-0
+                  ${getDifficultyStyles(ritual.difficulty)}
+                `}>
+                  {ritual.difficulty}
+                </span>
+              )}
+            </div>
+            
+            {/* Meta information */}
+            <div className="flex items-center gap-3 text-sm text-slate-500 mb-2">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                {formatDuration(ritual.duration)}
               </span>
-            )}
-          </div>
-
-          {/* Points indicator */}
-          <div className={`text-xs font-medium ${
-            ritual.completed ? 'text-emerald-600' : 'text-slate-500'
-          }`}>
-            +{Math.floor(ritual.duration / 5) + 10} pts
+              
+              {ritual.type && (
+                <span className="flex items-center gap-1 capitalize">
+                  <Target className="w-3.5 h-3.5" />
+                  {ritual.type}
+                </span>
+              )}
+              
+              <span className="flex items-center gap-1 text-blue-600 font-medium">
+                <Award className="w-3.5 h-3.5" />
+                +{getEstimatedPoints()} pts
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Enhanced Action Buttons */}
+        {/* Description */}
+        <p className={`text-sm leading-relaxed mb-4 ${
+          ritual.completed ? 'text-emerald-600' : 'text-slate-600'
+        }`}>
+          {ritual.description || 'A transformative wellness ritual designed to enhance your vitality.'}
+        </p>
+
+        {/* Benefits tags */}
+        {ritual.benefits && ritual.benefits.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {ritual.benefits.slice(0, 3).map((benefit, index) => (
+              <span 
+                key={`${benefit}-${index}`}
+                className={`px-2 py-1 text-xs rounded-lg font-medium ${
+                  ritual.completed 
+                    ? 'bg-emerald-100 text-emerald-700' 
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {benefit}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Progress bar for partially completed rituals */}
+        {ritual.progress && ritual.progress > 0 && !ritual.completed && (
+          <div className="mb-4">
+            <div className="flex justify-between items-center text-xs text-slate-600 mb-1">
+              <span>Progress</span>
+              <span>{Math.round(ritual.progress)}%</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-emerald-400 to-blue-500 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(ritual.progress, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Action buttons */}
         <div className="flex gap-3">
           {ritual.completed ? (
             <div className="flex-1 flex items-center justify-center py-3 px-4 text-emerald-700 font-medium bg-emerald-50 rounded-xl border border-emerald-200">
-              <svg className="w-4 h-4 mr-2 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+              <CheckCircle2 className="w-4 h-4 mr-2" />
               Completed Today
             </div>
           ) : (
             <>
               <button
-                onClick={handleStartRitual}
-                className="flex-1 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 shadow-lg"
+                onClick={handleStart}
+                disabled={loading}
+                className="flex-1 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 disabled:from-slate-400 disabled:to-slate-500 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 shadow-lg disabled:cursor-not-allowed disabled:transform-none"
+                aria-label={`Start ${ritual.name} ritual`}
               >
                 <span className="flex items-center justify-center">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Start Ritual
+                  <Play className="w-4 h-4 mr-2" />
+                  {loading ? 'Starting...' : 'Start Ritual'}
                 </span>
               </button>
               
               <button
-                onClick={handleCompleteRitual}
-                disabled={completeRitualMutation.isPending}
-                className="px-4 py-3 border-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 rounded-xl transition-all duration-200 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed group/btn"
+                onClick={handleComplete}
+                disabled={isCompleting || loading}
+                className="px-4 py-3 border-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all duration-200 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 group/btn"
                 title="Mark as complete"
+                aria-label={`Mark ${ritual.name} as complete`}
               >
-                {completeRitualMutation.isPending ? (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                {isCompleting ? (
+                  <div className="w-4 h-4 animate-spin border-2 border-emerald-600 border-t-transparent rounded-full"></div>
                 ) : (
-                  <svg className="w-4 h-4 group-hover/btn:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <CheckCircle2 className="w-4 h-4 group-hover/btn:scale-110 transition-transform duration-200" />
                 )}
               </button>
             </>
           )}
         </div>
 
-        {/* Progress indicator for in-progress rituals */}
-        {ritual.progress && ritual.progress > 0 && !ritual.completed && (
-          <div className="mt-4 pt-4 border-t border-slate-200">
-            <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
-              <span>Progress</span>
-              <span>{Math.round(ritual.progress)}%</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-1.5">
-              <div 
-                className="bg-gradient-to-r from-emerald-400 to-blue-500 h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${Math.min(ritual.progress, 100)}%` }}
-              />
-            </div>
+        {/* Additional features */}
+        {ritual.audioSrc && (
+          <div className="mt-3 flex items-center text-xs text-slate-500">
+            <Zap className="w-3.5 h-3.5 mr-1" />
+            <span>Includes guided audio</span>
           </div>
         )}
       </div>
@@ -278,4 +283,77 @@ const RitualCard = ({ ritual }) => {
   );
 };
 
-export default RitualCard;
+// Error boundary for RitualCard
+class RitualCardErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('RitualCard Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
+          <div className="text-red-400 text-4xl mb-3">⚠️</div>
+          <h3 className="text-red-800 font-semibold mb-2">Something went wrong</h3>
+          <p className="text-red-600 text-sm">Unable to load this ritual card</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Enhanced RitualCard with error boundary
+const SafeRitualCard = (props) => (
+  <RitualCardErrorBoundary>
+    <RitualCard {...props} />
+  </RitualCardErrorBoundary>
+);
+
+// PropTypes for better development experience
+RitualCard.defaultProps = {
+  ritual: {
+    name: 'Untitled Ritual',
+    type: 'meditation',
+    duration: 300,
+    completed: false,
+    difficulty: 'beginner',
+    description: 'A wellness ritual to enhance your vitality.',
+    benefits: [],
+    estimatedImpact: 10
+  },
+  onStart: () => {},
+  onComplete: () => {},
+  loading: false,
+  className: ''
+};
+
+// Memoize the component to prevent unnecessary re-renders
+const MemoizedRitualCard = React.memo(RitualCard, (prevProps, nextProps) => {
+  // Custom comparison logic
+  const ritualChanged = JSON.stringify(prevProps.ritual) !== JSON.stringify(nextProps.ritual);
+  const loadingChanged = prevProps.loading !== nextProps.loading;
+  const classNameChanged = prevProps.className !== nextProps.className;
+  
+  // Only re-render if these props changed
+  return !(ritualChanged || loadingChanged || classNameChanged);
+});
+
+export default SafeRitualCard;
+export { RitualCard, MemoizedRitualCard };
